@@ -10,7 +10,7 @@ app.config.from_pyfile('config.py')
 db = SQLAlchemy(app)
 
 # API Ninja config
-my_api_key = "B+Rpc1sVtV5cDnWYOXuiEw==uwuV9tafPifkLadt" # Personal Secret API Key for Tugas 01 LAW
+my_api_key = "B+Rpc1sVtV5cDnWYOXuiEw==uwuV9tafPifkLadt" # Personal Secret API Key for Tugas 02 LAW
 headers = { "X-Api-Key": my_api_key }
 
 # Email config
