@@ -1,7 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask import Flask, request, jsonify
 from flask_mail import Mail, Message
-import uuid, datetime, requests, joblib
+import uuid, datetime, joblib, aiohttp
 import numpy as np
 import tensorflow as tf
 
@@ -191,14 +191,55 @@ def calculate_user_daily_nutrition_needs(username):
     }), 200
 
 
-def get_foods_nutrition(food_names):
+async def get_exercises(exercise_name):
+    print(f"get_exercises({exercise_name}) is called!")
+    api_url = f"https://api.api-ninjas.com/v1/exercises?name={exercise_name}"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(api_url, headers=headers) as response:
+            return await response.json()
+        
+
+async def get_calories_burned(activity_name):
+    print(f"get_calories_burned({activity_name}) is called!")
+    api_url = f"https://api.api-ninjas.com/v1/caloriesburned?activity={activity_name}"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(api_url, headers=headers) as response:
+            return await response.json()
+
+
+async def get_foods_nutrition(food_names):
+    print(f"get_foods_nutrition({food_names}) is called!")
     api_url = f"https://api.api-ninjas.com/v1/nutrition?query={food_names}"
-    response = requests.get(api_url, headers=headers)
-    return response
+    async with aiohttp.ClientSession() as session:
+        async with session.get(api_url, headers=headers) as response:
+            return await response.json()
+
+
+@app.route('/call-API-Ninja-APIs-async', methods=['POST'])
+async def call_API_Ninja_APIs_with_async():
+    data = request.json
+    exercises_response = await get_exercises(data['exercise_name'])
+    calories_burned_response = await get_calories_burned(data['activity_name'])
+    foods_nutrition_response = await get_foods_nutrition(data['food_names'])
+
+    return jsonify({
+        'message': 'Successfully called 3 API Ninja APIs asynchronously!',
+        'exercises_response': exercises_response,
+        'calories_burned_response': calories_burned_response,
+        'foods_nutrition_response': foods_nutrition_response
+    }), 200
+
+
+async def get_user_daily_nutrition_needs(url):
+    print(f"get_user_daily_nutrition_needs({url}) is called!")
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            return await response.json()
 
 
 @app.route('/today-nutrition-intake/<username>', methods=['POST'])
-def check_user_today_nutrition_intake(username):
+async def check_user_today_nutrition_intake(username):
+    print(f"check_user_today_nutrition_intake({username}) is called!")
     calorie_intake = 0
     protein_intake = 0
     fat_intake = 0
@@ -208,11 +249,11 @@ def check_user_today_nutrition_intake(username):
     data = request.json
     food_names = ' or '.join(data.keys())
     
-    foods_nutrition_response = get_foods_nutrition(food_names)
-    if (foods_nutrition_response.status_code != requests.codes.ok):
-        return {"error": foods_nutrition_response.text}, foods_nutrition_response.status_code
+    foods_nutrition_response = await get_foods_nutrition(food_names)
+    if 'error' in foods_nutrition_response:
+        return {"error": foods_nutrition_response['error']}, 500
 
-    for food_nutrition in foods_nutrition_response.json():
+    for food_nutrition in foods_nutrition_response:
         serving = data[food_nutrition['name'].lower()]/100
         calorie_intake += food_nutrition['calories'] * serving
         protein_intake += food_nutrition['protein_g'] * serving
@@ -222,7 +263,7 @@ def check_user_today_nutrition_intake(username):
 
     base_url = request.base_url.split('/today')[0]
     url = f"{base_url}/daily-nutrition-needs/{username}"
-    user_daily_nutrition_needs = requests.get(url).json()
+    user_daily_nutrition_needs = await get_user_daily_nutrition_needs(url)
 
     lack_nutritions = []
     lack_nutritions_dict = {}
