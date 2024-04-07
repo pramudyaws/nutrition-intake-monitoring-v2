@@ -1,5 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask import Flask, request, jsonify
+from flask_mail import Mail, Message
 import uuid, datetime, requests, joblib
 import numpy as np
 import tensorflow as tf
@@ -7,6 +8,19 @@ import tensorflow as tf
 app = Flask(__name__)
 app.config.from_pyfile('config.py')
 db = SQLAlchemy(app)
+
+# API Ninja config
+my_api_key = "B+Rpc1sVtV5cDnWYOXuiEw==uwuV9tafPifkLadt" # Personal Secret API Key for Tugas 01 LAW
+headers = { "X-Api-Key": my_api_key }
+
+# Email config
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USE_TLS'] = False
+app.config['MAIL_USE_SSL'] = True
+app.config['MAIL_USERNAME'] = 'tugas2law.2006526106@gmail.com'
+app.config['MAIL_PASSWORD'] = 'xjjnawosejawcvax'
+mail = Mail(app)
 
 # Classes
 class UserAccount(db.Model):
@@ -179,8 +193,6 @@ def calculate_user_daily_nutrition_needs(username):
 
 def get_foods_nutrition(food_names):
     api_url = f"https://api.api-ninjas.com/v1/nutrition?query={food_names}"
-    my_api_key = "B+Rpc1sVtV5cDnWYOXuiEw==uwuV9tafPifkLadt" # Personal Secret API Key for Tugas 01 LAW
-    headers = { "X-Api-Key": my_api_key }
     response = requests.get(api_url, headers=headers)
     return response
 
@@ -278,16 +290,31 @@ def predict_cardiovascular_risk(username):
     prediction = model.predict(data_scaled)
     prediction_bool = int(prediction[0][0] > 0.5)
 
-    cardiovascular_risk = ""
-    if prediction_bool == 0:
-        cardiovascular_risk = "Safe"
-    else:
-        cardiovascular_risk = "Aware"
+    cardiovascular_risk = "Safe" if prediction_bool == 0 else "Aware"
 
     return jsonify({
         'username': username, 
         'cardiovascular_risk': cardiovascular_risk
     })
+
+
+@app.route('/send-email', methods=['POST'])
+def send_email():
+    data = request.json
+    recipient_email = data.get('recipient_email')
+
+    if not recipient_email:
+        return jsonify({'message': 'Missing recipient email'}), 400
+
+    msg = Message(subject='Test Send Email',
+                  sender=app.config['MAIL_USERNAME'],
+                  recipients=[recipient_email])
+    msg.body = 'Have a nice day!'
+    mail.send(msg)
+
+    return jsonify({'message': 'Email sent successfully!'})
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
